@@ -23,7 +23,7 @@ env:
   # ###########################################################################
   #
   # A (short) name, visible in the top (navigation-)bar and in the browser's tab/window-title (and search-engine results)
-  TXT_APP_NAME: ''
+  TXT_APP_NAME: 'Homepage'
   # An absolute/data-URL to an image, visible in the top (navigation-)bar
   TXT_APP_LOGO_URL: ''
   # The first heading, (only) visible on the main-page
@@ -67,7 +67,7 @@ env:
     Information
   # The ID of the Google Sheet(s) that contains the content for the region
   REGIONS_SHEET_IDS: >-
-    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    1hr_LW5Y2_g8Hh9Y_qYKkin-E7PLxI-aBlDEyJnPqiTQ
 
 # #############################################################################
 #
