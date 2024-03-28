@@ -1,0 +1,157 @@
+env:
+  # ###########################################################################
+  # FEATURES:
+  # ###########################################################################
+  #
+  # For offline support: (set to 'true' / 'false')
+  NG_USE_SERVICE_WORKER: 'true'
+  #
+  # Use the "Offers" content-type: (set to 'true' / 'false')
+  NG_USE_OFFERS: 'true'
+  #
+  # Use the "Q&A" content-type: (set to 'true' / 'false')
+  NG_USE_Q_AND_AS: 'true'
+  #
+  # When using "Q&A"s, you can enable search: (set to 'true' / 'false')
+  NG_USE_Q_AND_A_SEARCH: 'true'
+  #
+  # For demo-purpose only: A highly visible label to show instance name/version
+  ENV_NAME: ''
+  #
+  # ###########################################################################
+  # TEXT CONTENT:
+  # ###########################################################################
+  #
+  # A (short) name, visible in the top (navigation-)bar and in the browser's tab/window-title (and search-engine results)
+  TXT_APP_NAME: ''
+  # An absolute/data-URL to an image, visible in the top (navigation-)bar
+  TXT_APP_LOGO_URL: ''
+  # The first heading, (only) visible on the main-page
+  TXT_MAIN_PAGE_HEADER: ''
+  # The (optional) introduction text, (only) visible on the main-page.
+  # Can be multiple-lines of Markdown syntax or contain some HTML. Newlines need to be specified with `\n` or `<br />`.
+  TXT_MAIN_PAGE_INTRO: >-
+    \n
+    \n
+  #
+  # An (optional) notice on the bottom of the screen, can be overwritten by the sheet.
+  # Will override the (optional) bottom-right "Contact"-buttons from the sheet.
+  TXT_MAIN_PAGE_NOTICE: ''
+  #
+  # Contents of the 'error-page'
+  #
+  TXT_ERROR_HEADER: 'Data Unavailable'
+  # This Sentence will be followd by a link to the "Contact-URL" set below
+  TXT_ERROR_MESSAGE: 'Reach out to us at: '
+  # Provide a URL that has contact-information on it, or a `mailto:contact@example.org`-URL
+  TXT_ERROR_CONTACT_URL: 'https://github.com/${{ github.repository }}'
+  # Call to action on a link that will reload the current page
+  TXT_ERROR_RETRY: 'Try again?'
+  #
+  # ###########################################################################
+  # REGIONS/SHEETS:
+  # ###########################################################################
+  #
+  # When defining multiple regions/sheets, the order in the following 3 variables need to match.
+  # The last option in each list should NOT contain a comma (,) at the end.
+  #
+  # So in this example:
+  #  <REGION>  =  <REGION__LABEL>     =  <REGION__SHEET_ID>
+  #  "test"    =  "Test/Development"  =  "10SIJdAQSd6loqCyzwK409QS_01Fgp8P4aqoDO8iBvhY"
+  #
+  # The URL-part(s) to identify the region
+  REGIONS: >-
+    info
+  # The readable label(s) on the link to the region-page
+  REGIONS_LABELS: >-
+    Information
+  # The ID of the Google Sheet(s) that contains the content for the region
+  REGIONS_SHEET_IDS: >-
+    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# #############################################################################
+#
+# See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions
+#
+# #############################################################################
+
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    paths-ignore:
+      - '*.md'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Skip initial run directly after template instantiation
+    if: github.event.created != true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify ENV configuration
+        if: env.REGIONS_SHEET_IDS == 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' || env.TXT_APP_NAME == ''
+        run: 'echo "Please change the ENV configuration to real-world values." && exit 1'
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: 'package.json'
+          cache-dependency-path: 'package.json'
+          cache: 'npm'
+
+      - name: Install local
+        run: 'npm install --no-save'
+
+      - name: Set-up helpful-information
+        run: 'mv node_modules/helpful-information ./'
+
+      - name: Install helpful-information
+        working-directory: 'helpful-information'
+        run: 'npm ci --no-fund --no-audit'
+        env:
+          HUSKY: 0
+
+      - name: Build
+        working-directory: 'helpful-information'
+        run: 'npm run build:production -- --output-path=../www --base-href=/${GITHUB_REPOSITORY#*/}/'
+        env:
+          # See all variables: https://github.com/rodekruis/helpful-information/blob/main/.env.example
+          NG_PRODUCTION: 'true'
+          GOOGLE_SHEETS_API_KEY: ${{ secrets.GOOGLE_SHEETS_API_KEY }}
+          GOOGLE_SHEETS_API_URL: 'https://sheets.googleapis.com/v4/spreadsheets'
+          AI_CONNECTION_STRING: ${{ secrets.AI_CONNECTION_STRING }}
+
+      - name: Add 404.html
+        run: 'cp www/index.html www/404.html'
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v3
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'www'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
